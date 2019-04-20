@@ -94,8 +94,8 @@ void vfio_mask_single_irqindex(VFIODevice *vbasedev, int index)
     ioctl(vbasedev->fd, VFIO_DEVICE_SET_IRQS, &irq_set);
 }
 
-uint64_t corblbase = 0;
-uint64_t rirblbase = 0;
+uint64_t corbbase = 0;
+uint64_t rirbbase = 0;
 uint64_t last_corbwp = 0;
 uint64_t last_rirbwp = 0;
 uint64_t corbs[1000] = { 0 };
@@ -136,10 +136,24 @@ void vfio_region_write(void *opaque, hwaddr addr,
 
     if (region->nr == 0 && addr == 0x40) {
         printf("CORBLBASE write of 0x%" PRIx64 "\n", data);
-        corblbase = data;
+        if (size == 8) {
+            corbbase = data;
+        } else {
+            corbbase = (corbbase & 0xffffffff00000000) | (data & 0xffffffff);
+        }
+    } else if (region->nr == 0 && addr == 0x44) {
+        printf("CORBUBASE write of 0x%" PRIx64 "\n", data);
+        corbbase = (data << 32) | (corbbase & 0xffffffff);
     } else if (region->nr == 0 && addr == 0x50) {
         printf("RIRBLBASE write of 0x%" PRIx64 "\n", data);
-        rirblbase = data;
+        if (size == 8) {
+            rirbbase = data;
+        } else {
+            rirbbase = (rirbbase & 0xffffffff00000000) | (data & 0xffffffff);
+        }
+    } else if (region->nr == 0 && addr == 0x54) {
+        printf("RIRBUBASE write of 0x%" PRIx64 "\n", data);
+        rirbbase = (data << 32) | (rirbbase & 0xffffffff);
     } else if (region->nr == 0 && addr == 0x48) {
         uint8_t buf[16];
         uint64_t x;
@@ -147,7 +161,7 @@ void vfio_region_write(void *opaque, hwaddr addr,
         printf("CORBWP advance to %ld, last WP %ld\n", data, last_corbwp);
 
         for (x = last_corbwp + 1; x <= data; x++) {
-            uint64_t dmaaddr = corblbase + (x * 4);
+            uint64_t dmaaddr = corbbase + (x * 4);
 
             cpu_physical_memory_read(dmaaddr, buf, 4);
             corbs[x] = (uint32_t)ldl_p(buf);
@@ -226,7 +240,7 @@ uint64_t vfio_region_read(void *opaque,
         printf("RIRBWP advance to %ld, last WP %ld\n", data, last_rirbwp);
 
         for (x = last_rirbwp + 1; x <= data; x++) {
-            uint64_t dmaaddr = rirblbase + (x * 8);
+            uint64_t dmaaddr = rirbbase + (x * 8);
 
             cpu_physical_memory_read(dmaaddr, buf, 4);
             rirbs[x] = (uint32_t)ldl_p(buf);

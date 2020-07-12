@@ -241,6 +241,17 @@ supported_whpx_target() {
     return 1
 }
 
+supported_vmm_target() {
+    test "$vmm" = "yes" || return 1
+    glob "$1" "*-softmmu" || return 1
+    case "${1%-softmmu}" in
+        i386|x86_64)
+            return 0
+        ;;
+    esac
+    return 1
+}
+
 supported_target() {
     case "$1" in
         *-softmmu)
@@ -268,6 +279,7 @@ supported_target() {
     supported_hax_target "$1" && return 0
     supported_hvf_target "$1" && return 0
     supported_whpx_target "$1" && return 0
+    supported_vmm_target "$1" && return 0
     print_error "TCG disabled, but hardware accelerator not available for '$target'"
     return 1
 }
@@ -389,6 +401,7 @@ kvm="no"
 hax="no"
 hvf="no"
 whpx="no"
+vmm="no"
 rdma=""
 pvrdma=""
 gprof="no"
@@ -1210,6 +1223,10 @@ for opt do
   ;;
   --enable-whpx) whpx="yes"
   ;;
+  --disable-vmm) vmm="no"
+  ;;
+  --enable-vmm) vmm="yes"
+  ;;
   --disable-tcg-interpreter) tcg_interpreter="no"
   ;;
   --enable-tcg-interpreter) tcg_interpreter="yes"
@@ -1832,6 +1849,7 @@ disabled with --disable-FEATURE, default is enabled if available:
   hax             HAX acceleration support
   hvf             Hypervisor.framework acceleration support
   whpx            Windows Hypervisor Platform acceleration support
+  vmm             OpenBSD VMM acceleration support
   rdma            Enable RDMA-based migration
   pvrdma          Enable PVRDMA support
   vde             support for vde network
@@ -2867,6 +2885,19 @@ if test "$whpx" != "no" ; then
             feature_not_found "WinHvPlatform" "WinHvEmulation is not installed"
         fi
         whpx="no"
+    fi
+fi
+
+##########################################
+# OpenBSD VMM check
+if test "$vmm" != "no" ; then
+    if check_include "machine/vmmvar.h"; then
+        vmm="yes"
+    else
+        if test "$vmm" = "yes"; then
+            feature_not_found "VMM" "VMM is not available"
+        fi
+        vmm="no"
     fi
 fi
 
@@ -6651,6 +6682,7 @@ echo "KVM support       $kvm"
 echo "HAX support       $hax"
 echo "HVF support       $hvf"
 echo "WHPX support      $whpx"
+echo "VMM support       $vmm"
 echo "TCG support       $tcg"
 if test "$tcg" = "yes" ; then
     echo "TCG debug enabled $debug_tcg"
@@ -7997,6 +8029,9 @@ if supported_hvf_target $target; then
 fi
 if supported_whpx_target $target; then
     echo "CONFIG_WHPX=y" >> $config_target_mak
+fi
+if supported_vmm_target $target; then
+    echo "CONFIG_VMM=y" >> $config_target_mak
 fi
 if test "$target_aligned_only" = "yes" ; then
   echo "TARGET_ALIGNED_ONLY=y" >> $config_target_mak

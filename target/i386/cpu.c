@@ -6053,6 +6053,9 @@ static void x86_cpu_reset(DeviceState *dev)
     else if (hvf_enabled()) {
         hvf_reset_vcpu(s);
     }
+    else if (vmm_enabled()) {
+        vmm_reset_vcpu(cpu);
+    }
 #endif
 }
 
